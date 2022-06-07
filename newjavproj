@@ -1,0 +1,171 @@
+#!/bin/bash
+
+# newjavproj
+# Utility for making new Java projects
+# Inspired by my desire not to do the same things more than once
+# author: Scott Czerneda 
+# website: sczerneda.github.io
+#
+# version: 0.3
+# date: 2022/06/06
+
+#Utility exit for errors with the usage of the script
+#	e.g. Incorrect parameters, arguments, etc
+bad_exit(){
+	usage
+	echo "Use option -h for full usage information"
+	exit 1
+}
+#Utility exit for errors outside of the script's usage
+#	e.g. if directory already exists
+meh_exit(){
+	exit 2
+}
+usage(){
+	echo "Usage: newjavproj [ -p package_name ] [ -hi ] project name"
+}
+helptext() {
+	echo -e "\t-n\tUse to supply a name for the project. If omitted
+		the project is called \"new_project\""
+	echo -e "\t-p\tSupply a name for a starting package. If omitted
+		no packages are created"
+	echo -e "\t-h\tDisplay the help message (this message)"
+	echo -e "\t-i\tCreate a installation instruction file, useful for 
+		large projects"
+	echo -e "\t-m\tCreates a .java file with a main method. Argument given 
+		will be the class name. Also creates a test version of the file"
+}
+
+#DIRECTORY CONSTRUCTORS
+buildSub(){
+	for sub in "$@"
+	do
+		echo " ${PROJECT_NAME}/${sub}" 
+		mkdir -p "${PROJECT_NAME}/${sub}"
+	done
+}
+#Minimum
+minimumProject(){
+	buildSub bin src src/main/java src/test/java
+}
+mediumProject(){
+	minimumProject
+	buildSub docs src/resources
+}
+largeProject(){
+	mediumProject
+	buildSub adr
+}
+buildpackage(){
+	#TODO Add a parser to split up long dot separated package names
+	# echo " ${PROJECT_NAME}/src/main/java/$1" 
+	# mkdir -p "${PROJECT_NAME}/src/main/java/$1"
+	# buildSub src/main/java/$1
+	for package in "$@"
+	do
+		buildSub src/main/java/"${package}"
+	done
+}
+
+while getopts "p:hlm" OPTIONS; do
+	case $OPTIONS in
+	h)
+		#Display help and usage information to the console
+		usage
+		helptext
+		exit 0
+		;;
+	l)
+		#Large project
+		scopeflag="l"
+		;;
+	m)
+		#Medium project
+		#largest scope gets priority, ie 'l' overrides 'm'
+		if [ -z $scopeflag ];
+		then
+			scopeflag="m"
+		fi
+		;;
+	p) 
+		#User supplied a package name
+		PACKAGE_NAME=$OPTARG
+		;;
+	?)
+		echo "Unknown arguments"
+		bad_exit	
+		;;
+	esac
+done
+
+#Shift the positions of the command line arguments
+# This removes the optional arguments and leaves the fixed arguments
+shift "$(($OPTIND -1))"
+
+if [ -z "$1"]; then
+	echo "You must supply a project name"
+	bad_exit
+else
+	PROJECT_NAME=$1
+fi
+
+#TODO Validate directory name
+
+# Check if directory with PROJECT_NAME already exists
+if [ -d ${PROJECT_NAME} ]; then
+	echo "Directory with that name already exists";
+	meh_exit	
+fi
+
+echo "Creating a new project : \"${PROJECT_NAME}\""
+mkdir ${PROJECT_NAME}
+
+# SUBDIRECTORY CREATION
+echo "Creating subdirectories..."
+case $scopeflag in
+	"m")
+		mediumProject
+		;;
+	"l")
+		largeProject
+		;;
+	*)
+		minimumProject
+		;;
+esac 
+
+# PACKAGE CREATION
+if [ -n ${PACKAGE_NAME} ]; then
+	echo "Creating package"
+	buildpackage ${PACKAGE_NAME}
+fi
+
+#INITIALIZE LOCAL GIT REPO
+git init ${PROJECT_NAME}
+
+#CREATE THE PROJECT README FILE
+echo "Creating readme file..."
+echo "Project: ${PROJECT_NAME} Automatically generated:" > ${PROJECT_NAME}/README.md
+date >> ${PROJECT_NAME}/README.md
+echo "#Explanation of Project" >>${PROJECT_NAME}/README.md
+echo "#Installation Guide" >>${PROJECT_NAME}/README.md
+
+#CREATE THE GITIGNORE FILE
+#Create using cat and a 'here-document'
+#  Creates with the contents up to EOF
+echo "Creating gitignore file..."
+cat > ${PROJECT_NAME}/.gitignore << EOF
+#Folders#
+bin\
+
+#Class Files and executables#
+*.class
+*.jar
+EOF
+#Here's where the contents to fill gitignore stop
+#LESSON: There can't be an whitespace in the line ending the here-document
+#		Even AFTER the EOF. No whitespace. None. Zilch.
+
+# CREATION PROCESS COMPLETE
+ls -al ./${PROJECT_NAME}
+echo -e "\nProject creation complete\n${PROJECT_NAME} is ready. Good luck! Have fun!"

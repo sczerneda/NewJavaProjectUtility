@@ -6,12 +6,15 @@
 # author: Scott Czerneda 
 # website: sczerneda.github.io
 #
-# version: 0.3
-# date: 2022/06/06
+# version: 0.4
+# date: 2022/06/07
 
 #Utility exit for errors with the usage of the script
 #	e.g. Incorrect parameters, arguments, etc
 bad_exit(){
+	if [ -n $1 ]; then
+		echo $1
+	fi
 	usage
 	echo "Use option -h for full usage information"
 	exit 1
@@ -19,19 +22,21 @@ bad_exit(){
 #Utility exit for errors outside of the script's usage
 #	e.g. if directory already exists
 meh_exit(){
+	if [ -n $1 ]; then
+		echo $1
+	fi
 	exit 2
 }
 usage(){
-	echo "Usage: newjavproj [ -p package_name ] [ -hi ] project name"
+	echo "Usage: newjavproj [ -p package_name ] [ -c class_name ] [ -hlm ] project name"
 }
 helptext() {
-	echo -e "\t-n\tUse to supply a name for the project. If omitted
-		the project is called \"new_project\""
+	echo -e "\t-c\tCreate a boilerplate class for main method. Takes a class
+			name as an argument, or if used without an argument uses the
+			project name"
 	echo -e "\t-p\tSupply a name for a starting package. If omitted
 		no packages are created"
 	echo -e "\t-h\tDisplay the help message (this message)"
-	echo -e "\t-i\tCreate a installation instruction file, useful for 
-		large projects"
 	echo -e "\t-m\tCreates a .java file with a main method. Argument given 
 		will be the class name. Also creates a test version of the file"
 }
@@ -55,6 +60,8 @@ mediumProject(){
 largeProject(){
 	mediumProject
 	buildSub adr
+	#Create instruction file
+	touch InstallationInstruction.txt
 }
 buildpackage(){
 	#TODO Add a parser to split up long dot separated package names
@@ -67,8 +74,12 @@ buildpackage(){
 	done
 }
 
-while getopts "p:hlm" OPTIONS; do
+while getopts "p:c:hlm" OPTIONS; do
 	case $OPTIONS in
+	c)
+		#Boilerplate class requested
+		CLASS_NAME=${OPTARG}
+		;;
 	h)
 		#Display help and usage information to the console
 		usage
@@ -92,8 +103,7 @@ while getopts "p:hlm" OPTIONS; do
 		PACKAGE_NAME=$OPTARG
 		;;
 	?)
-		echo "Unknown arguments"
-		bad_exit	
+		bad_exit "Unknown arguments"
 		;;
 	esac
 done
@@ -103,8 +113,7 @@ done
 shift "$(($OPTIND -1))"
 
 if [ -z "$1"]; then
-	echo "You must supply a project name"
-	bad_exit
+	bad_exit "Missing argument: Project name"
 else
 	PROJECT_NAME=$1
 fi
@@ -113,8 +122,7 @@ fi
 
 # Check if directory with PROJECT_NAME already exists
 if [ -d ${PROJECT_NAME} ]; then
-	echo "Directory with that name already exists";
-	meh_exit	
+	meh_exit "Directory with that name already exists"
 fi
 
 echo "Creating a new project : \"${PROJECT_NAME}\""
@@ -149,6 +157,17 @@ echo "Project: ${PROJECT_NAME} Automatically generated:" > ${PROJECT_NAME}/READM
 date >> ${PROJECT_NAME}/README.md
 echo "#Explanation of Project" >>${PROJECT_NAME}/README.md
 echo "#Installation Guide" >>${PROJECT_NAME}/README.md
+
+#CREATE INITIAL PROGRAM ENTRY POINT
+echo "Creating class ${CLASS_NAME}"
+cat > ${PROJECT_NAME}/src/main/java/${CLASS_NAME} << EOF
+package $PACKAGE_NAME;
+public class $CLASS_NAME {
+	public static void main(String[] args){
+		System.out.println("Hello world");
+	}
+}
+EOF
 
 #CREATE THE GITIGNORE FILE
 #Create using cat and a 'here-document'
